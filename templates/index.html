@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Story Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-4xl font-bold text-center mb-8 text-gray-800">AI Story Generator</h1>
+        
+        <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-md p-6">
+            <form id="storyForm" class="space-y-6">
+                <!-- Topic Input -->
+                <div>
+                    <label for="topic" class="block text-sm font-medium text-gray-700">Story Topic</label>
+                    <input type="text" id="topic" name="topic" required
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                </div>
+
+                <!-- Model Selection -->
+                <div>
+                    <label for="model" class="block text-sm font-medium text-gray-700">Gemini Model</label>
+                    <select id="model" name="model" 
+                            class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        {% for model in models %}
+                        <option value="{{ model }}">{{ model }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Two Column Layout -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Expertise Selection -->
+                    <div>
+                        <label for="expertise" class="block text-sm font-medium text-gray-700">Expertise</label>
+                        <select id="expertise" name="expertise" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            {% for expertise in expertise_levels %}
+                            <option value="{{ expertise }}">{{ expertise|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Tone Selection -->
+                    <div>
+                        <label for="tone" class="block text-sm font-medium text-gray-700">Tone Style</label>
+                        <select id="tone" name="tone" required
+                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            {% for tone in tone_styles %}
+                            <option value="{{ tone }}">{{ tone|title }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Context Input -->
+                <div>
+                    <label for="context" class="block text-sm font-medium text-gray-700">
+                        Additional Context (Optional)
+                    </label>
+                    <textarea id="context" name="context" rows="3"
+                              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"></textarea>
+                </div>
+
+                <!-- Number of Parts -->
+                <div>
+                    <label for="total_parts" class="block text-sm font-medium text-gray-700">Number of Parts</label>
+                    <input type="range" id="total_parts" name="total_parts" min="1" max="5" value="3"
+                           class="mt-1 block w-full">
+                    <div class="text-center text-sm text-gray-600">
+                        Parts: <span id="partsValue">3</span>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div>
+                    <button type="submit" id="generateBtn"
+                            class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Generate Story
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Story Output -->
+        <div id="storyOutput" class="max-w-2xl mx-auto mt-8 bg-white rounded-lg shadow-md p-6 hidden">
+            <h2 class="text-2xl font-bold mb-4 text-gray-800">Generated Story</h2>
+            <div id="storyContent" class="prose max-w-none mb-6 whitespace-pre-wrap"></div>
+            <button id="downloadBtn"
+                    class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+                Download Story
+            </button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script>
+        // Update parts value display
+        const partsSlider = document.getElementById('total_parts');
+        const partsValue = document.getElementById('partsValue');
+        partsSlider.addEventListener('input', (e) => {
+            partsValue.textContent = e.target.value;
+        });
+
+        // Form submission
+        document.getElementById('storyForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const generateBtn = document.getElementById('generateBtn');
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Generating...';
+
+            const formData = {
+                topic: document.getElementById('topic').value,
+                model: document.getElementById('model').value,
+                expertise: document.getElementById('expertise').value,
+                tone: document.getElementById('tone').value,
+                context: document.getElementById('context').value,
+                total_parts: parseInt(document.getElementById('total_parts').value)
+            };
+
+            try {
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                document.getElementById('storyContent').textContent = data.story;
+                document.getElementById('storyOutput').classList.remove('hidden');
+
+                Toastify({
+                    text: "Story generated successfully!",
+                    duration: 3000,
+                    gravity: "top",
+                    position: "right",
+                    backgroundColor: "#10B981"
+                }).showToast();
+
+            } catch (error) {
+                Toastify({
+                    text: error.message || "An error occurred",
+                    duration: 3000,
+                    gravity: "top",
+                    position: "right",
+                    backgroundColor: "#EF4444"
+                }).showToast();
+            } finally {
+                generateBtn.disabled = false;
+                generateBtn.textContent = 'Generate Story';
+            }
+        });
+
+        // Download functionality
+        document.getElementById('downloadBtn').addEventListener('click', async () => {
+            const story = document.getElementById('storyContent').textContent;
+            
+            try {
+                const response = await fetch('/download', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ story })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Download failed');
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'generated_story.txt';
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                a.remove();
+
+            } catch (error) {
+                Toastify({
+                    text: error.message || "Download failed",
+                    duration: 3000,
+                    gravity: "top",
+                    position: "right",
+                    backgroundColor: "#EF4444"
+                }).showToast();
+            }
+        });
+    </script>
+</body>
+</html>
